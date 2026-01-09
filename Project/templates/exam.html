@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exam - Question {{ question_index }}</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Exam: {{ question.domain }}</h1>
+            <div class="progress">
+                <span>Question {{ question_index }} of {{ total_questions }}</span>
+            </div>
+        </header>
+        
+        <main>
+            <div class="card">
+                <div class="question-header">
+                    <h2>Question {{ question_index }}</h2>
+                    {% if question.difficulty %}
+                    <div class="difficulty-badge difficulty-{{ question.difficulty.lower() }}">
+                        <span class="difficulty-label">Difficulty:</span>
+                        <span class="difficulty-value">{{ question.difficulty }}</span>
+                        {% if question.difficulty_score %}
+                        <span class="difficulty-score">({{ "%.1f"|format(question.difficulty_score) }}/10)</span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+                
+                {% if question.domain_info.background_info %}
+                <div class="background-info">
+                    <h3>Background Information</h3>
+                    <p>{{ question.domain_info.background_info }}</p>
+                    
+                    {% if question.domain_info.key_concepts %}
+                    <div class="key-concepts">
+                        <h4>Key Concepts:</h4>
+                        <ul>
+                            {% for concept in question.domain_info.key_concepts %}
+                            <li>{{ concept }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                    
+                    {% if question.domain_info.context %}
+                    <div class="context">
+                        <p><em>{{ question.domain_info.context }}</em></p>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+                
+                <div class="question-text">
+                    <h3>Question:</h3>
+                    <p>{{ question.question_text }}</p>
+                </div>
+                
+                <form id="responseForm">
+                    <input type="hidden" name="session_id" value="{{ session.session_id }}">
+                    <input type="hidden" name="question_id" value="{{ question.question_id }}">
+                    
+                    <div class="form-group">
+                        <label for="response_text">Your Answer:</label>
+                        <textarea 
+                            id="response_text" 
+                            name="response_text" 
+                            rows="12" 
+                            required 
+                            placeholder="Type your essay response here..."
+                            autofocus
+                        ></textarea>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Submit Answer</button>
+                    </div>
+                </form>
+                
+                <div id="loading" class="loading" style="display: none;">
+                    <p>Grading your response... Please wait.</p>
+                    <div class="spinner"></div>
+                </div>
+                
+                <div id="error" class="error" style="display: none;"></div>
+            </div>
+        </main>
+    </div>
+    
+    <script>
+        const startTime = Date.now();
+        
+        document.getElementById('responseForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const timeSpent = (Date.now() - startTime) / 1000;
+            
+            const data = {
+                session_id: formData.get('session_id'),
+                question_id: formData.get('question_id'),
+                response_text: formData.get('response_text'),
+                time_spent_seconds: timeSpent
+            };
+            
+            const loading = document.getElementById('loading');
+            const error = document.getElementById('error');
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            
+            loading.style.display = 'block';
+            error.style.display = 'none';
+            submitBtn.disabled = true;
+            
+            try {
+                const response = await fetch('/api/submit-response', {
+                    method: 'POST',
+                    body: new URLSearchParams(data)
+                });
+                
+                if (!response.ok) {
+                    let errorMessage = 'Failed to submit response';
+                    try {
+                        const errorData = await response.json();
+                        errorMessage = errorData.detail || errorData.message || errorMessage;
+                    } catch (e) {
+                        errorMessage = `Server error: ${response.status} ${response.statusText}`;
+                    }
+                    throw new Error(errorMessage);
+                }
+                
+                const result = await response.json();
+                
+                // Check if exam is complete
+                const currentQuestion = parseInt('{{ question_index }}');
+                const totalQuestions = parseInt('{{ total_questions }}');
+                
+                if (currentQuestion >= totalQuestions) {
+                    window.location.href = '/results/{{ session.session_id }}';
+                } else {
+                    // Reload to show next question
+                    window.location.reload();
+                }
+            } catch (err) {
+                let errorMessage = 'An unknown error occurred';
+                if (err instanceof Error) {
+                    errorMessage = err.message;
+                } else if (typeof err === 'string') {
+                    errorMessage = err;
+                } else if (err && err.message) {
+                    errorMessage = err.message;
+                } else if (err && err.detail) {
+                    errorMessage = err.detail;
+                } else {
+                    errorMessage = JSON.stringify(err);
+                }
+                error.textContent = `Error: ${errorMessage}`;
+                error.style.display = 'block';
+                loading.style.display = 'none';
+                submitBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

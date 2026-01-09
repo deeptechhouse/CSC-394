@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Exam - AI-Powered Exam System</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Create New Exam</h1>
+            <a href="/" class="back-link">← Back to Home</a>
+        </header>
+        
+        <main>
+            <div class="card">
+                <form id="createExamForm">
+                    <div class="form-group">
+                        <label for="student_id">Student ID:</label>
+                        <input type="text" id="student_id" name="student_id" required placeholder="Enter your student ID">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="domain">Subject Domain:</label>
+                        <input type="text" id="domain" name="domain" required placeholder="e.g., Computer Science, History, Mathematics" value="Computer Science">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="num_questions">Number of Questions:</label>
+                        <input type="number" id="num_questions" name="num_questions" min="1" max="10" value="3" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="professor_instructions">Professor Instructions (Optional):</label>
+                        <textarea id="professor_instructions" name="professor_instructions" rows="4" placeholder="Any specific instructions for question generation..."></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="target_difficulty">Target Difficulty Level (Optional):</label>
+                        <select id="target_difficulty" name="target_difficulty">
+                            <option value="">Mixed (Default)</option>
+                            <option value="Easy">Easy</option>
+                            <option value="Medium">Medium</option>
+                            <option value="Hard">Hard</option>
+                        </select>
+                        <small class="form-hint">Select a difficulty level for all questions, or leave as "Mixed" for varied difficulty.</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <button type="submit" class="btn btn-primary">Generate Exam</button>
+                    </div>
+                </form>
+                
+                <div id="loading" class="loading" style="display: none;">
+                    <p>Generating exam questions... This may take a moment.</p>
+                    <div class="spinner"></div>
+                </div>
+                
+                <div id="error" class="error" style="display: none;"></div>
+            </div>
+        </main>
+    </div>
+    
+    <script>
+        document.getElementById('createExamForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const data = {
+                student_id: formData.get('student_id'),
+                domain: formData.get('domain'),
+                num_questions: parseInt(formData.get('num_questions')),
+                professor_instructions: formData.get('professor_instructions') || null,
+                target_difficulty: formData.get('target_difficulty') || null
+            };
+            
+            const loading = document.getElementById('loading');
+            const error = document.getElementById('error');
+            
+            loading.style.display = 'block';
+            error.style.display = 'none';
+            
+            try {
+                const response = await fetch('/api/create-exam', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Failed to create exam');
+                }
+                
+                const result = await response.json();
+                window.location.href = `/exam/${result.session_id}`;
+            } catch (err) {
+                error.textContent = `Error: ${err.message}`;
+                error.style.display = 'block';
+                loading.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>

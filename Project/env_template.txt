@@ -1,0 +1,15 @@
+# Together.ai API Configuration
+# Get your API key from https://api.together.xyz/
+TOGETHER_API_KEY=your_together_ai_api_key_here
+
+# Optional: Specify a different model
+# TOGETHER_MODEL=mistralai/Mixtral-8x7B-Instruct-v0.1
+
+# Server Configuration
+HOST=0.0.0.0
+PORT=8000
+DEBUG=False
+
+# Exam Configuration (Optional)
+DEFAULT_DOMAIN=History
+DEFAULT_PROFESSOR_INSTRUCTIONS=

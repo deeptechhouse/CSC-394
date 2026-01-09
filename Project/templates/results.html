@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exam Results</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Exam Results</h1>
+            <p class="subtitle">Student: {{ session.student_id }}</p>
+        </header>
+        
+        <main>
+            {% if all_complete %}
+            <div class="card">
+                <h2>Exam Complete</h2>
+                <p>All questions have been answered and graded.</p>
+            </div>
+            {% endif %}
+            
+            {% for grade in session.grades %}
+            <div class="card grade-card">
+                {% set question = session.questions | selectattr("question_id", "equalto", grade.question_id) | first %}
+                
+                <div class="grade-header">
+                    <h2>Question {{ loop.index }}</h2>
+                    <div class="score">
+                        <span class="points">{{ "%.1f"|format(grade.total_points_awarded) }} / {{ "%.1f"|format(grade.total_points_possible) }}</span>
+                        <span class="percentage">({{ "%.1f"|format(grade.percentage) }}%)</span>
+                        <span class="state state-{{ grade.state.lower() }}">{{ grade.state }}</span>
+                    </div>
+                </div>
+                
+                {% if question %}
+                <div class="question-review">
+                    <div class="question-header-with-difficulty">
+                        <h3>Question:</h3>
+                        {% if question.difficulty %}
+                        <div class="difficulty-badge difficulty-{{ question.difficulty.lower() }}">
+                            <span class="difficulty-label">Difficulty:</span>
+                            <span class="difficulty-value">{{ question.difficulty }}</span>
+                            {% if question.difficulty_score %}
+                            <span class="difficulty-score">({{ "%.1f"|format(question.difficulty_score) }}/10)</span>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <p>{{ question.question_text }}</p>
+                </div>
+                {% endif %}
+                
+                <div class="grade-explanation">
+                    <h3>Overall Feedback:</h3>
+                    {% if grade.explanation.overall_feedback %}
+                        <p>{{ grade.explanation.overall_feedback }}</p>
+                    {% else %}
+                        <p><em>No detailed feedback available. Score: {{ "%.1f"|format(grade.total_points_awarded) }} out of {{ "%.1f"|format(grade.total_points_possible) }} points.</em></p>
+                    {% endif %}
+                </div>
+                
+                <div class="criterion-grades">
+                    <h3>Criterion Breakdown:</h3>
+                    {% if grade.explanation.criterion_grades %}
+                        {% for cg in grade.explanation.criterion_grades %}
+                        <div class="criterion-item">
+                            <div class="criterion-header">
+                                <span class="criterion-name">{{ cg.criterion }}</span>
+                                <span class="criterion-score">
+                                    {{ "%.1f"|format(cg.points_awarded) }} / {{ "%.1f"|format(cg.max_points) }}
+                                    {% if cg.satisfied %}
+                                    <span class="checkmark">✓</span>
+                                    {% else %}
+                                    <span class="cross">✗</span>
+                                    {% endif %}
+                                </span>
+                            </div>
+                            <p class="criterion-explanation">{{ cg.explanation }}</p>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p><em>Detailed criterion breakdown not available. Please see overall feedback above.</em></p>
+                    {% endif %}
+                </div>
+                
+                {% if grade.explanation.strengths %}
+                <div class="strengths">
+                    <h3>Strengths:</h3>
+                    <ul>
+                        {% for strength in grade.explanation.strengths %}
+                        <li>{{ strength }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                
+                {% if grade.explanation.weaknesses %}
+                <div class="weaknesses">
+                    <h3>Areas for Improvement:</h3>
+                    <ul>
+                        {% for weakness in grade.explanation.weaknesses %}
+                        <li>{{ weakness }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                
+                {% if grade.explanation.suggestions %}
+                <div class="suggestions">
+                    <h3>Suggestions:</h3>
+                    <ul>
+                        {% for suggestion in grade.explanation.suggestions %}
+                        <li>{{ suggestion }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+            
+            {% if session.grades %}
+            <div class="card summary">
+                <h2>Summary</h2>
+                {% set total_awarded = session.grades | sum(attribute="total_points_awarded") %}
+                {% set total_possible = session.grades | sum(attribute="total_points_possible") %}
+                {% set overall_percentage = (total_awarded / total_possible * 100) if total_possible > 0 else 0 %}
+                
+                <div class="summary-stats">
+                    <div class="stat">
+                        <span class="stat-label">Total Points:</span>
+                        <span class="stat-value">{{ "%.1f"|format(total_awarded) }} / {{ "%.1f"|format(total_possible) }}</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Overall Score:</span>
+                        <span class="stat-value">{{ "%.1f"|format(overall_percentage) }}%</span>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            <div class="actions">
+                <a href="/" class="btn btn-secondary">Return to Home</a>
+            </div>
+        </main>
+    </div>
+</body>
+</html>
