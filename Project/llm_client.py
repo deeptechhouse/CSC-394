@@ -83,7 +83,10 @@ class LLMClient:
         Returns:
             Parsed Python dictionary
         """
+        import re
+        
         # Try to find dictionary in the response
+        original_text = response_text
         response_text = response_text.strip()
         
         # Remove markdown code blocks if present
@@ -101,18 +104,17 @@ class LLMClient:
                         end_idx = i
                         break
             
-            response_text = "\n".join(lines[start_idx:end_idx])
+            response_text = "\n".join(lines[start_idx:end_idx]).strip()
         
-        # Try to parse as Python literal
+        # Method 1: Try to parse as Python literal (handles single quotes, etc.)
         try:
-            # Use ast.literal_eval for safe evaluation
             result = ast.literal_eval(response_text)
             if isinstance(result, dict):
                 return result
-        except (ValueError, SyntaxError):
+        except (ValueError, SyntaxError) as e:
             pass
         
-        # Try JSON parsing as fallback
+        # Method 2: Try JSON parsing (requires double quotes)
         try:
             result = json.loads(response_text)
             if isinstance(result, dict):
@@ -120,33 +122,95 @@ class LLMClient:
         except json.JSONDecodeError:
             pass
         
-        # If all else fails, try to extract dictionary using regex
-        import re
+        # Method 3: Try to find and extract dictionary from text (more robust regex)
+        # This pattern matches nested dictionaries better
         dict_pattern = r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}'
         matches = re.findall(dict_pattern, response_text, re.DOTALL)
         if matches:
-            try:
-                result = ast.literal_eval(matches[-1])  # Use last match
-                if isinstance(result, dict):
-                    return result
-            except (ValueError, SyntaxError):
-                pass
+            # Try each match, starting with the longest (most likely to be complete)
+            matches_sorted = sorted(matches, key=len, reverse=True)
+            for match in matches_sorted:
+                try:
+                    # Try Python literal eval first
+                    result = ast.literal_eval(match)
+                    if isinstance(result, dict):
+                        return result
+                except (ValueError, SyntaxError):
+                    try:
+                        # Try JSON as fallback
+                        result = json.loads(match)
+                        if isinstance(result, dict):
+                            return result
+                    except json.JSONDecodeError:
+                        continue
         
-        # If we still can't parse it, return a helpful error dict instead of raising
+        # Method 4: Try to fix common JSON issues and retry
+        # Replace single quotes with double quotes (but be careful with strings)
+        try:
+            # Only replace single quotes that are clearly not in strings
+            fixed_text = response_text.replace("'", '"')
+            # Fix Python None, True, False to JSON equivalents
+            fixed_text = fixed_text.replace('None', 'null')
+            fixed_text = fixed_text.replace('True', 'true')
+            fixed_text = fixed_text.replace('False', 'false')
+            result = json.loads(fixed_text)
+            if isinstance(result, dict):
+                return result
+        except json.JSONDecodeError:
+            pass
+        
+        # Method 5: Try to extract just the first complete dictionary
+        # Find the first { and try to match it with the last }
+        first_brace = response_text.find('{')
+        if first_brace != -1:
+            # Count braces to find the matching closing brace
+            brace_count = 0
+            for i in range(first_brace, len(response_text)):
+                if response_text[i] == '{':
+                    brace_count += 1
+                elif response_text[i] == '}':
+                    brace_count -= 1
+                    if brace_count == 0:
+                        # Found matching closing brace
+                        dict_str = response_text[first_brace:i+1]
+                        try:
+                            result = ast.literal_eval(dict_str)
+                            if isinstance(result, dict):
+                                return result
+                        except (ValueError, SyntaxError):
+                            try:
+                                result = json.loads(dict_str.replace("'", '"').replace('None', 'null').replace('True', 'true').replace('False', 'false'))
+                                if isinstance(result, dict):
+                                    return result
+                            except json.JSONDecodeError:
+                                pass
+                        break
+        
+        # If all else fails, return a helpful error dict instead of raising
         # This prevents the 'str' object has no attribute 'get' error
+        # Log the raw response for debugging (first 1000 chars)
+        error_preview = original_text[:1000] if len(original_text) > 1000 else original_text
+        
+        # Try to print debug info if in debug mode (for troubleshooting)
+        if settings.debug:
+            print(f"\n[DEBUG] Failed to parse LLM response:")
+            print(f"Response length: {len(original_text)} characters")
+            print(f"First 500 chars: {original_text[:500]}")
+            print(f"Last 200 chars: {original_text[-200:]}")
+        
         return {
             "error": "Could not parse LLM response as dictionary",
-            "raw_response": response_text[:500],
+            "raw_response": error_preview,
             "total_points_awarded": 0.0,
             "total_points_possible": 100.0,
             "percentage": 0.0,
             "state": "Error",
             "explanation": {
-                "overall_feedback": f"Error parsing grading response. Raw response: {response_text[:200]}",
+                "overall_feedback": f"Error: Could not parse AI grading response. The AI may have returned an invalid format. Please try submitting your response again.",
                 "criterion_grades": [],
                 "strengths": [],
-                "weaknesses": ["Unable to parse AI grading response"],
-                "suggestions": []
+                "weaknesses": ["Unable to parse AI grading response - format error"],
+                "suggestions": ["Please try resubmitting your response", "If the problem persists, contact support"]
             }
         }
     
@@ -160,7 +224,8 @@ class LLMClient:
         Returns:
             Dictionary containing question data
         """
-        response = self._call_api(prompt, temperature=0.8, max_tokens=2000)
+        # Increase max_tokens to ensure complete response
+        response = self._call_api(prompt, temperature=0.8, max_tokens=3000)
         return self._extract_python_dict(response)
     
     def grade_response(self, prompt: str) -> Dict[str, Any]:
@@ -173,7 +238,8 @@ class LLMClient:
         Returns:
             Dictionary containing grading results
         """
-        response = self._call_api(prompt, temperature=0.3, max_tokens=2000)
+        # Increase max_tokens for grading to ensure complete response
+        response = self._call_api(prompt, temperature=0.3, max_tokens=3000)
         result = self._extract_python_dict(response)
         
         # Ensure we always return a dict
