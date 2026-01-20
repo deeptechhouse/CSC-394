@@ -117,6 +117,7 @@ async def create_exam(request: CreateExamRequest):
     except Exception as e:
         # Log the full exception for debugging
         import traceback
+        traceback.print_exc()
         error_detail = str(e)
         
         # Provide specific error messages for common issues

@@ -79,12 +79,23 @@ class QuestionGenerator:
         
         # Build rubric with validation
         criteria = rubric_data.get("criteria", [])
-        if not isinstance(criteria, list):
+        if isinstance(criteria, str):
+            criteria = [c.strip() for c in criteria.split(",") if c.strip()]
+        elif not isinstance(criteria, list):
             criteria = []
         
         points_per_criterion = rubric_data.get("points_per_criterion", {})
         if not isinstance(points_per_criterion, dict):
             points_per_criterion = {}
+        else:
+            # Normalize numeric values for rubric points
+            normalized_points = {}
+            for key, value in points_per_criterion.items():
+                try:
+                    normalized_points[key] = float(value)
+                except (ValueError, TypeError):
+                    normalized_points[key] = 0.0
+            points_per_criterion = normalized_points
         
         total_points = rubric_data.get("total_points", 0.0)
         try:
@@ -93,12 +104,35 @@ class QuestionGenerator:
             total_points = 0.0
         
         required_elements = rubric_data.get("required_elements", [])
-        if not isinstance(required_elements, list):
+        if isinstance(required_elements, str):
+            required_elements = [e.strip() for e in required_elements.split(",") if e.strip()]
+        elif not isinstance(required_elements, list):
             required_elements = []
         
         # Ensure key_concepts is a list
-        if not isinstance(key_concepts, list):
+        if isinstance(key_concepts, str):
+            key_concepts = [c.strip() for c in key_concepts.split(",") if c.strip()]
+        elif not isinstance(key_concepts, list):
             key_concepts = []
+
+        # Normalize difficulty score to a float if possible
+        if difficulty_score is not None:
+            try:
+                if isinstance(difficulty_score, str):
+                    cleaned = difficulty_score.replace("/10", "").replace("out of 10", "")
+                    difficulty_score = float(cleaned.strip())
+                else:
+                    difficulty_score = float(difficulty_score)
+            except (ValueError, TypeError):
+                difficulty_score = None
+
+        # Normalize difficulty label when possible
+        if isinstance(difficulty, str):
+            difficulty_clean = difficulty.strip().capitalize()
+            if difficulty_clean in {"Easy", "Medium", "Hard"}:
+                difficulty = difficulty_clean
+            else:
+                difficulty = None
         
         rubric = GradingRubric(
             criteria=criteria,
