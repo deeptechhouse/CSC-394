@@ -59,6 +59,13 @@ async def create_exam_page(request: Request):
 async def create_exam(request: CreateExamRequest):
     """Create a new exam session with generated questions."""
     try:
+        # Check if API key is configured
+        if not settings.together_api_key or settings.together_api_key.strip() == "":
+            raise HTTPException(
+                status_code=500,
+                detail="API key not configured. Please set TOGETHER_API_KEY environment variable or create a .env file with your Together.ai API key."
+            )
+        
         # Generate questions
         questions = question_generator.generate_question_batch(
             domain=request.domain,
@@ -98,8 +105,39 @@ async def create_exam(request: CreateExamRequest):
                 for q in questions
             ]
         }
+    except ValueError as e:
+        # More specific error message for validation errors
+        error_msg = str(e)
+        # Provide helpful guidance for common errors
+        if "API key" in error_msg.lower():
+            raise HTTPException(status_code=500, detail=error_msg)
+        elif "closing brace" in error_msg.lower() or "' and end with" in error_msg:
+            error_msg = "Failed to parse AI response. The AI may have returned an invalid format. Please check: 1) Your API key is valid, 2) The API is accessible, 3) Try again."
+        raise HTTPException(status_code=500, detail=f"Failed to generate exam questions: {error_msg}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error creating exam: {str(e)}")
+        # Log the full exception for debugging
+        import traceback
+        error_detail = str(e)
+        
+        # Provide specific error messages for common issues
+        if "API key" in error_detail.lower() or "authentication" in error_detail.lower():
+            raise HTTPException(
+                status_code=500,
+                detail="API authentication failed. Please check your TOGETHER_API_KEY is correct and set in your .env file or environment variables."
+            )
+        elif "rate limit" in error_detail.lower():
+            raise HTTPException(status_code=500, detail="API rate limit exceeded. Please wait a moment and try again.")
+        elif "timeout" in error_detail.lower():
+            raise HTTPException(status_code=500, detail="API request timed out. The service may be slow. Please try again.")
+        elif "connection" in error_detail.lower():
+            raise HTTPException(status_code=500, detail="Could not connect to the AI service. Please check your internet connection and try again.")
+        elif "closing brace" in error_detail.lower() or "' and end with" in error_detail:
+            error_detail = "Failed to parse AI response. The AI may have returned an invalid format. Please check: 1) Your API key is valid, 2) The API is accessible, 3) Try again."
+        elif len(error_detail) > 300:
+            # Truncate very long error messages but keep important parts
+            error_detail = error_detail[:300] + "..."
+        
+        raise HTTPException(status_code=500, detail=f"Error creating exam: {error_detail}")
 
 
 @app.get("/exam/{session_id}", response_class=HTMLResponse)
@@ -181,8 +219,18 @@ async def submit_response(
     try:
         grade_result = grader.grade_response(question, student_response)
         session.grades.append(grade_result)
+    except ValueError as e:
+        # More specific error for parsing/validation issues
+        error_msg = str(e)
+        if "parse" in error_msg.lower() or "invalid format" in error_msg.lower():
+            error_msg = "Failed to parse AI grading response. The AI may have returned an invalid format. Please try submitting your response again."
+        raise HTTPException(status_code=500, detail=f"Error grading response: {error_msg}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error grading response: {str(e)}")
+        # General error handling
+        error_detail = str(e)
+        if len(error_detail) > 300:
+            error_detail = error_detail[:300] + "..."
+        raise HTTPException(status_code=500, detail=f"Error grading response: {error_detail}")
     
     # Check if exam is complete
     if len(session.responses) == len(session.questions):

@@ -35,7 +35,7 @@ Return your response as a valid Python dictionary with the following structure:
 
 Make sure the question is appropriate for the domain level and tests critical thinking and understanding, not just recall.
 
-CRITICAL: You MUST return ONLY a valid Python dictionary. Do not include any explanatory text before or after the dictionary. Do not use markdown code blocks. Start your response directly with the opening brace { and end with the closing brace }. The dictionary must be valid Python syntax with proper quotes, commas, and brackets."""
+CRITICAL: You MUST return ONLY a valid Python dictionary. Do not include any explanatory text before or after the dictionary. Do not use markdown code blocks. Start your response directly with the opening brace {{ and end with the closing brace }}. The dictionary must be valid Python syntax with proper quotes, commas, and brackets."""
 
 
 # Template for grading student responses
@@ -106,7 +106,7 @@ Return your response as a valid Python dictionary with the following structure:
 
 Be thorough, fair, and constructive in your evaluation. Consider the depth of understanding demonstrated, not just keyword matching.
 
-CRITICAL: You MUST return ONLY a valid Python dictionary. Do not include any explanatory text before or after the dictionary. Do not use markdown code blocks. Start your response directly with the opening brace { and end with the closing brace }. The dictionary must be valid Python syntax with proper quotes, commas, and brackets."""
+CRITICAL: You MUST return ONLY a valid Python dictionary. Do not include any explanatory text before or after the dictionary. Do not use markdown code blocks. Start your response directly with the opening brace {{ and end with the closing brace }}. The dictionary must be valid Python syntax with proper quotes, commas, and brackets."""
 
 
 def format_question_generation_prompt(

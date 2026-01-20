@@ -66,13 +66,31 @@ class Grader:
         )
         
         # Call LLM to grade
-        llm_response = self.llm_client.grade_response(prompt)
+        try:
+            llm_response = self.llm_client.grade_response(prompt)
+        except ValueError as e:
+            # If parsing failed, return a helpful error grade result
+            return GradeResult(
+                question_id=question.question_id,
+                total_points_awarded=0.0,
+                total_points_possible=question.rubric.total_points,
+                percentage=0.0,
+                explanation=GradeExplanation(
+                    overall_feedback=f"Unable to parse AI grading response: {str(e)}. Please try submitting again or contact support if the issue persists.",
+                    criterion_grades=[],
+                    strengths=[],
+                    weaknesses=["Unable to parse AI grading response - format error"],
+                    suggestions=["Please try resubmitting your response", "If the problem persists, contact support"]
+                ),
+                graded_at=datetime.now(),
+                state="Error"
+            )
         
-        # Ensure llm_response is a dictionary
+        # Ensure llm_response is a dictionary (should always be after our improvements)
         if not isinstance(llm_response, dict):
             raise ValueError(f"Expected dictionary from LLM, got {type(llm_response).__name__}: {str(llm_response)[:200]}")
         
-        # Check if there's an error in the response
+        # Check if there's an error in the response (this shouldn't happen with new error handling)
         if "error" in llm_response:
             # If there was a parsing error, create a basic grade result
             return GradeResult(

@@ -46,6 +46,21 @@ class QuestionGenerator:
         # Call LLM to generate question
         llm_response = self.llm_client.generate_question(prompt)
         
+        # Validate that llm_response is a dictionary
+        if not isinstance(llm_response, dict):
+            error_msg = f"LLM returned invalid response type: {type(llm_response).__name__}"
+            if isinstance(llm_response, str):
+                error_msg += f". Response preview: {llm_response[:200]}"
+            raise ValueError(error_msg)
+        
+        # Check if there's an error in the response
+        if "error" in llm_response:
+            error_msg = llm_response.get("error", "Unknown error from LLM")
+            raw_response = llm_response.get("raw_response", "")
+            if raw_response:
+                error_msg += f". Response preview: {raw_response[:200]}"
+            raise ValueError(f"Failed to generate question: {error_msg}")
+        
         # Extract components
         background_info = llm_response.get("background_info", "")
         key_concepts = llm_response.get("key_concepts", [])
@@ -54,14 +69,42 @@ class QuestionGenerator:
         difficulty = llm_response.get("difficulty", None)
         difficulty_score = llm_response.get("difficulty_score", None)
         
-        rubric_data = llm_response.get("rubric", {})
+        # Validate essential fields
+        if not question_text:
+            raise ValueError("LLM response missing required field: question_text")
         
-        # Build rubric
+        rubric_data = llm_response.get("rubric", {})
+        if not isinstance(rubric_data, dict):
+            rubric_data = {}
+        
+        # Build rubric with validation
+        criteria = rubric_data.get("criteria", [])
+        if not isinstance(criteria, list):
+            criteria = []
+        
+        points_per_criterion = rubric_data.get("points_per_criterion", {})
+        if not isinstance(points_per_criterion, dict):
+            points_per_criterion = {}
+        
+        total_points = rubric_data.get("total_points", 0.0)
+        try:
+            total_points = float(total_points)
+        except (ValueError, TypeError):
+            total_points = 0.0
+        
+        required_elements = rubric_data.get("required_elements", [])
+        if not isinstance(required_elements, list):
+            required_elements = []
+        
+        # Ensure key_concepts is a list
+        if not isinstance(key_concepts, list):
+            key_concepts = []
+        
         rubric = GradingRubric(
-            criteria=rubric_data.get("criteria", []),
-            points_per_criterion=rubric_data.get("points_per_criterion", {}),
-            total_points=rubric_data.get("total_points", 0.0),
-            required_elements=rubric_data.get("required_elements", [])
+            criteria=criteria,
+            points_per_criterion=points_per_criterion,
+            total_points=total_points,
+            required_elements=required_elements
         )
         
         # Build domain information
